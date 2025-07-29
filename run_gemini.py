@@ -51,7 +51,7 @@ def create_github_pr(repo_url, head_branch, base_branch, title, body):
 def main():
     parser = argparse.ArgumentParser(description="Run Gemini CLI and create a GitHub PR.")
     parser.add_argument("prompt", help="The prompt to pass to the Gemini CLI.")
-    parser.add_argument("--repo", default="https://https://github.com/SarthakAjmera26/buildpacks-ajmerasarthak", help="The GitHub repository URL.")
+    parser.add_argument("--repo", default="https://github.com/SarthakAjmera26/buildpacks-ajmerasarthak", help="The GitHub repository URL.")
     parser.add_argument("--branch", default="main", help="The base branch for the pull request.")
     parser.add_argument("--title", help="The title of the pull request. Defaults to the prompt.")
     parser.add_argument("--body", default="PR created by Gemini CLI automation script.", help="The body of the pull request.")
