@@ -23,5 +23,16 @@ COPY . .
 RUN git config --global --add safe.directory /app
 RUN git config --global user.email "ajmerasarthak@gmail.com"
 RUN git config --global user.name "SarthakAjmera26"
+
+RUN echo '#!/bin/sh\n\
+if [ "$1" = "username" ]; then\n\
+  echo "oauth2"\n\
+elif [ "$1" = "password" ]; then\n\
+  echo "${GITHUB_TOKEN}"\n\
+fi' > /usr/local/bin/git-credential-github-token && \
+    chmod +x /usr/local/bin/git-credential-github-token && \
+    git config --global credential.helper "/usr/local/bin/git-credential-github-token" && \
+    git config --global credential.https://github.com.useHttpPath true
+
 # Command to run the application with the specified arguments
 CMD ["python3", "run_gemini.py", "create a new file named hello-00.txt in buildpacks/cmd/go", "--repo", "https://github.com/SarthakAjmera26/buildpacks-ajmerasarthak", "--branch", "main", "--title", "Gemini: Create hello-00.txt"]
