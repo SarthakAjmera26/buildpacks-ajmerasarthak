@@ -9,6 +9,8 @@ def run_gemini_cli(prompt):
     try:
         print(f"Running Gemini CLI with prompt: {prompt}")
         # Replace 'gemini' with the actual command if it's different
+        # Note: Gemini CLI might need interactive authentication.
+        # Ensure GEMINI_API_KEY is set as an environment variable for non-interactive use.
         subprocess.run(['gemini', '--yolo'], input=prompt.encode(), check=True)
         print("Gemini CLI executed successfully.")
     except FileNotFoundError:
@@ -58,6 +60,11 @@ def main():
     args = parser.parse_args()
 
     pr_title = args.title if args.title else args.prompt
+    github_token = os.environ.get("GITHUB_TOKEN")
+
+    if not github_token:
+        print("Error: GITHUB_TOKEN environment variable not set. Cannot proceed with Git operations.")
+        exit(1)
 
     # 1. Create a new branch for the changes
     new_branch = f"gemini-changes-{os.urandom(4).hex()}"
@@ -75,10 +82,19 @@ def main():
     subprocess.run(['git', 'commit', '-m', pr_title], check=True)
 
     # 4. Push the new branch
-    print(f"Pushing branch {new_branch} to origin...")
-    subprocess.run(['git', 'push', '-u', 'origin', new_branch], check=True)
+    # Embed the GITHUB_TOKEN directly into the remote URL for authentication
+    # This format is: https://oauth2:<token>@github.com/<user>/<repo>.git
+    parsed_repo_url = args.repo.replace('https://github.com/', '') # Get "user/repo"
+    push_url = f"https://oauth2:{github_token}@github.com/{parsed_repo_url}.git"
+    
+    print(f"Pushing branch {new_branch} to origin ({push_url})...")
+    # Set the remote URL temporarily for this push, or create a temporary remote
+    # A simpler way is to just pass the full URL directly to git push
+    subprocess.run(['git', 'push', push_url, new_branch], check=True)
+
 
     # 5. Create the Pull Request
+    # The create_github_pr function uses requests, which needs the token in headers.
     create_github_pr(args.repo, new_branch, args.branch, pr_title, args.body)
 
 if __name__ == "__main__":
