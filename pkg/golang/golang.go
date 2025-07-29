@@ -45,10 +45,13 @@ const (
 
 var (
 	// goVersionRegexp is used to parse `go version`'s output.
-	goVersionRegexp = regexp.MustCompile(`^go version go(\d+(\.\d+){1,2})([a-z]+\d+)? .*$`)
+	goVersionRegexp = regexp.MustCompile(`^go version go(\d+(\.\d+){1,2})([a-z]+\d+)? .*)
 
 	// goModVersionRegexp is used to get correct declaration of Go version from go.mod file.
-	goModVersionRegexp = regexp.MustCompile(`(?m)^\s*go\s+(\d+(\.\d+){1,2})\s*$`)
+	goModVersionRegexp = regexp.MustCompile(`(?m)^\s*go\s+(\d+(\.\d+){1,2})\s*)
+
+	// goWorkVersionRegexp is used to get correct declaration of Go version from go.work file.
+	goWorkVersionRegexp = regexp.MustCompile(`(?m)^\s*go\s+(\d+(\.\d+){1,2})\s*)
 
 	// goVersionsURL can be use to download a list of available, stable versions of Go.
 	goVersionsURL = "https://go.dev/dl/?mode=json"
@@ -89,10 +92,10 @@ func SupportsGoCleanModCache(ctx *gcp.Context) (bool, error) {
 	return VersionMatches(ctx, ">=1.13.0")
 }
 
-// VersionMatches checks if the installed version of Go and the version specified in go.mod match the given version range.
+// VersionMatches checks if the installed version of Go and the version specified in go.mod or go.work match the given version range.
 // The range string has the following format: https://github.com/blang/semver#ranges.
 func VersionMatches(ctx *gcp.Context, versionRange string) (bool, error) {
-	v, err := GoModVersion(ctx)
+	v, err := GoVersionFromSource(ctx)
 	if err != nil {
 		return false, err
 	}
@@ -102,7 +105,7 @@ func VersionMatches(ctx *gcp.Context, versionRange string) (bool, error) {
 
 	version, err := semver.NewVersion(v)
 	if err != nil {
-		return false, gcp.InternalErrorf("unable to parse go.mod version string %q: %s", v, err)
+		return false, gcp.InternalErrorf("unable to parse go version string %q: %s", v, err)
 	}
 
 	goVersionMatches, err := semver.NewConstraint(versionRange)
@@ -161,6 +164,38 @@ func GoModVersion(ctx *gcp.Context) (string, error) {
 	return match[1], nil
 }
 
+// GoWorkVersion reads the version of Go from a go.work file if present.
+// If not present or if version isn't there returns an empty string.
+func GoWorkVersion(ctx *gcp.Context) (string, error) {
+	v, err := readGoWork(ctx)
+	if err != nil {
+		return "", fmt.Errorf("reading go.work: %w", err)
+	}
+	if v == "" {
+		return v, nil
+	}
+
+	match := goWorkVersionRegexp.FindStringSubmatch(v)
+	if len(match) < 2 || match[1] == "" {
+		return "", nil
+	}
+
+	return match[1], nil
+}
+
+// GoVersionFromSource reads the version of Go from go.work, falling back to go.mod.
+// If neither is present or if version isn't in them, it returns an empty string.
+func GoVersionFromSource(ctx *gcp.Context) (string, error) {
+	v, err := GoWorkVersion(ctx)
+	if err != nil {
+		return "", err
+	}
+	if v != "" {
+		return v, nil
+	}
+	return GoModVersion(ctx)
+}
+
 // readGoVersion returns the output of `go version`.
 // It can be overridden for testing.
 var readGoVersion = func(ctx *gcp.Context) (string, error) {
@@ -198,6 +233,24 @@ var readGoMod = func(ctx *gcp.Context) (string, error) {
 	return string(bytes), nil
 }
 
+// readGoWork reads the go.work file if present. If not present, returns an empty string.
+// It can be overridden for testing.
+var readGoWork = func(ctx *gcp.Context) (string, error) {
+	goWorkPath := goWorkPath(ctx)
+	goWorkExists, err := ctx.FileExists(goWorkPath)
+	if err != nil {
+		return "", err
+	}
+	if !goWorkExists {
+		return "", nil
+	}
+	bytes, err := ctx.ReadFile(goWorkPath)
+	if err != nil {
+		return "", err
+	}
+	return string(bytes), nil
+}
+
 // NewGoWorkspaceLayer returns a new layer for `go env GOPATH` or the go workspace. The
 // layer is configured for caching if possible. It only supports caching for "go mod"
 // based builds.
@@ -221,7 +274,14 @@ func NewGoWorkspaceLayer(ctx *gcp.Context) (*libcnb.Layer, error) {
 		return l, nil
 	}
 
-	hash, cached, err := cache.HashAndCheck(ctx, l, goModCacheKey, cache.WithFiles(goModPath(ctx)))
+	cacheFiles := []string{goModPath(ctx)}
+	if exists, err := ctx.FileExists(goWorkPath(ctx)); err != nil {
+		return nil, err
+	} else if exists {
+		cacheFiles = append(cacheFiles, goWorkPath(ctx))
+	}
+
+	hash, cached, err := cache.HashAndCheck(ctx, l, goModCacheKey, cache.WithFiles(cacheFiles...))
 	if err != nil {
 		if os.IsNotExist(err) {
 			// when go.mod doesn't exist, clear any previously cached bits and return an empty layer
@@ -242,6 +302,10 @@ func NewGoWorkspaceLayer(ctx *gcp.Context) (*libcnb.Layer, error) {
 
 func goModPath(ctx *gcp.Context) string {
 	return filepath.Join(ctx.ApplicationRoot(), "go.mod")
+}
+
+func goWorkPath(ctx *gcp.Context) string {
+	return filepath.Join(ctx.ApplicationRoot(), "go.work")
 }
 
 // ExecWithGoproxyFallback runs the given command with a GOPROXY fallback.
