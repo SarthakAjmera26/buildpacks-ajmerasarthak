@@ -42,22 +42,27 @@ const (
 	goPathLayerName = "gopath"
 	// The key used when a layers' cache is keyed off of the go mod
 	goModCacheKey = "go-mod-sha"
-	envGoVersion  = "GOOGLE_GO_VERSION"
+	// The key used when a layers' cache is keyed off of the go work
+	goWorkCacheKey = "go-work-sha"
+	envGoVersion   = "GOOGLE_GO_VERSION"
 )
 
 var (
 	// goVersionRegexp is used to parse `go version`'s output.
-	goVersionRegexp = regexp.MustCompile(`^go version go(\d+(\.\d+){1,2})([a-z]+\d+)? .*$`)
+	goVersionRegexp = regexp.MustCompile(`^go version go(\d+(\.\d+){1,2})([a-z]+\d+)? .*)
 
 	// goModVersionRegexp is used to get correct declaration of Go version from go.mod file.
-	goModVersionRegexp = regexp.MustCompile(`(?m)^\s*go\s+(\d+(\.\d+){1,2})\s*$`)
+	goModVersionRegexp = regexp.MustCompile(`(?m)^\s*go\s+(\d+(\.\d+){1,2})\s*)
+
+	// goWorkVersionRegexp is used to get correct declaration of Go version from go.work file.
+	goWorkVersionRegexp = regexp.MustCompile(`(?m)^\s*go\s+(\d+(\.\d+){1,2})\s*)
 
 	// goVersionsURL can be use to download a list of available, stable versions of Go.
 	goVersionsURL = "https://go.dev/dl/?mode=json"
 
 	// latestGoVersionPerStack is the latest Go version per stack to use if not specified by the user.
 	latestGoVersionPerStack = map[string]string{
-		runtime.Ubuntu2204: "1.23.*",
+		runtime.Ubuntu2204: "1.22.*",
 		runtime.Ubuntu2404: "1.23.*",
 	}
 )
@@ -193,9 +198,15 @@ func GoVersion(ctx *gcp.Context) (string, error) {
 // GoModVersion reads the version of Go from a go.mod file if present.
 // If not present or if version isn't there returns an empty string.
 func GoModVersion(ctx *gcp.Context) (string, error) {
-	v, err := readGoMod(ctx)
+	v, err := readGoWork(ctx)
 	if err != nil {
-		return "", fmt.Errorf("reading go.mod: %w", err)
+		return "", fmt.Errorf("reading go.work: %w", err)
+	}
+	if v == "" {
+		v, err = readGoMod(ctx)
+		if err != nil {
+			return "", fmt.Errorf("reading go.mod: %w", err)
+		}
 	}
 	if v == "" {
 		return v, nil
@@ -246,6 +257,24 @@ var readGoMod = func(ctx *gcp.Context) (string, error) {
 	return string(bytes), nil
 }
 
+// readGoWork reads the go.work file if present. If not present, returns an empty string.
+// It can be overridden for testing.
+var readGoWork = func(ctx *gcp.Context) (string, error) {
+	goWorkPath := goWorkPath(ctx)
+	goWorkExists, err := ctx.FileExists(goWorkPath)
+	if err != nil {
+		return "", err
+	}
+	if !goWorkExists {
+		return "", nil
+	}
+	bytes, err := ctx.ReadFile(goWorkPath)
+	if err != nil {
+		return "", err
+	}
+	return string(bytes), nil
+}
+
 // NewGoWorkspaceLayer returns a new layer for `go env GOPATH` or the go workspace. The
 // layer is configured for caching if possible. It only supports caching for "go mod"
 // based builds.
@@ -269,10 +298,29 @@ func NewGoWorkspaceLayer(ctx *gcp.Context) (*libcnb.Layer, error) {
 		return l, nil
 	}
 
-	hash, cached, err := cache.HashAndCheck(ctx, l, goModCacheKey, cache.WithFiles(goModPath(ctx)))
+	// Check for go.work first, then fall back to go.mod.
+	goWorkPath := goWorkPath(ctx)
+	goWorkExists, err := ctx.FileExists(goWorkPath)
+	if err != nil {
+		return nil, err
+	}
+
+	var hash string
+	var cached bool
+	var cacheKey, filePath string
+
+	if goWorkExists {
+		cacheKey = goWorkCacheKey
+		filePath = goWorkPath
+	} else {
+		cacheKey = goModCacheKey
+		filePath = goModPath(ctx)
+	}
+
+	hashVal, cached, err := cache.HashAndCheck(ctx, l, cacheKey, cache.WithFiles(filePath))
 	if err != nil {
 		if os.IsNotExist(err) {
-			// when go.mod doesn't exist, clear any previously cached bits and return an empty layer
+			// when go.mod/go.work doesn't exist, clear any previously cached bits and return an empty layer
 			l.Cache = false
 			cleanModCache(ctx)
 			return l, nil
@@ -282,14 +330,18 @@ func NewGoWorkspaceLayer(ctx *gcp.Context) (*libcnb.Layer, error) {
 	if cached {
 		return l, nil
 	}
-	ctx.Debugf("go.mod SHA has changed: clearing GOPATH layer's cache")
+	ctx.Debugf("%s SHA has changed: clearing GOPATH layer's cache", filepath.Base(filePath))
 	cleanModCache(ctx)
-	cache.Add(ctx, l, goModCacheKey, hash)
+	cache.Add(ctx, l, cacheKey, hashVal)
 	return l, nil
 }
 
 func goModPath(ctx *gcp.Context) string {
 	return filepath.Join(ctx.ApplicationRoot(), "go.mod")
+}
+
+func goWorkPath(ctx *gcp.Context) string {
+	return filepath.Join(ctx.ApplicationRoot(), "go.work")
 }
 
 // ExecWithGoproxyFallback runs the given command with a GOPROXY fallback.
