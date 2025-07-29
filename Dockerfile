@@ -35,4 +35,4 @@ fi' > /usr/local/bin/git-credential-github-token && \
     git config --global credential.https://github.com.useHttpPath true
 
 # Command to run the application with the specified arguments
-CMD ["python3", "run_gemini.py", "create a new file named hello-00.txt in buildpacks/cmd/go", "--repo", "https://github.com/SarthakAjmera26/buildpacks-ajmerasarthak", "--branch", "main", "--title", "Gemini: Create hello-00.txt"]
+CMD ["python3", "run_gemini.py", "create a new file named hello-00.txt in app/cmd/go"]
