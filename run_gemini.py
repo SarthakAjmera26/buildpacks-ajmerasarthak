@@ -60,9 +60,9 @@ def main():
     pr_title = args.title if args.title else args.prompt
 
     # 1. Create a new branch for the changes
-    # new_branch = f"gemini-changes-{os.urandom(4).hex()}"
-    # print(f"Creating and switching to new branch: {new_branch}")
-    # subprocess.run(['git', 'checkout', '-b', new_branch], check=True)
+    new_branch = f"gemini-changes-{os.urandom(4).hex()}"
+    print(f"Creating and switching to new branch: {new_branch}")
+    subprocess.run(['git', 'checkout', '-b', new_branch], check=True)
 
     # 2. Run the Gemini CLI
     run_gemini_cli(args.prompt)
