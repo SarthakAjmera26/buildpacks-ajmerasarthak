@@ -23,6 +23,7 @@ import (
 	"github.com/GoogleCloudPlatform/buildpacks/pkg/buildererror"
 	"github.com/GoogleCloudPlatform/buildpacks/pkg/cache"
 	gcp "github.com/GoogleCloudPlatform/buildpacks/pkg/gcpbuildpack"
+	"github.com/GoogleCloudPlatform/buildpacks/pkg/ruby"
 	"github.com/buildpacks/libcnb/v2"
 )
 
@@ -55,7 +56,7 @@ func detectFn(ctx *gcp.Context) (gcp.DetectResult, error) {
 }
 
 func buildFn(ctx *gcp.Context) error {
-	var lockFile string
+	var lockFile, gemFile string
 	hasGemfile, err := ctx.FileExists("Gemfile")
 	if err != nil {
 		return err
@@ -76,6 +77,7 @@ func buildFn(ctx *gcp.Context) error {
 			return buildererror.Errorf(buildererror.StatusFailedPrecondition, "Could not find Gemfile.lock file in your app. Please make sure your bundle is up to date before deploying.")
 		}
 		lockFile = "Gemfile.lock"
+		gemFile = "Gemfile"
 	} else if hasGemsRB {
 		gemsLockedExists, err := ctx.FileExists("gems.locked")
 		if err != nil {
@@ -85,6 +87,13 @@ func buildFn(ctx *gcp.Context) error {
 			return buildererror.Errorf(buildererror.StatusFailedPrecondition, "Could not find gems.locked file in your app. Please make sure your bundle is up to date before deploying.")
 		}
 		lockFile = "gems.locked"
+		gemFile = "gems.rb"
+	}
+
+	if gemFile != "" {
+		if err := ruby.MaybeAddBundledGems(ctx, filepath.Join(ctx.ApplicationRoot(), gemFile)); err != nil {
+			return fmt.Errorf("adding bundled gems: %w", err)
+		}
 	}
 
 	// Remove any user-provided local bundle config and cache that can interfere with the build process.
