@@ -19,10 +19,12 @@ package main
 import (
 	"fmt"
 	"path/filepath"
+	"regexp"
 
 	"github.com/GoogleCloudPlatform/buildpacks/pkg/buildererror"
 	"github.com/GoogleCloudPlatform/buildpacks/pkg/cache"
 	gcp "github.com/GoogleCloudPlatform/buildpacks/pkg/gcpbuildpack"
+	"github.com/Masterminds/semver"
 	"github.com/buildpacks/libcnb"
 )
 
@@ -31,6 +33,8 @@ const (
 	dependencyHashKey = "dependency_hash"
 	rubyVersionKey    = "ruby_version"
 )
+
+var rubyVersionRe = regexp.MustCompile(`^ruby\s+([^\s]+)`)
 
 func main() {
 	gcp.Main(detectFn, buildFn)
@@ -153,6 +157,10 @@ func buildFn(ctx *gcp.Context) error {
 			return err
 		}
 
+		if err := installDefaultGemsForRuby34(ctx); err != nil {
+			return fmt.Errorf("installing default gems for ruby 3.4+: %w", err)
+		}
+
 		// Find any gem-installed binary directory and symlink as a static path
 		foundBinDirs, err := ctx.Glob(".bundle/gems/ruby/*/bin")
 		if err != nil {
@@ -178,6 +186,59 @@ func buildFn(ctx *gcp.Context) error {
 	// Always link local .bundle directory to the actual installation stored in the layer.
 	if err := ctx.Symlink(bundleOutput, ".bundle"); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+// installDefaultGemsForRuby34 installs gems that are no longer default in Ruby 3.4+.
+func installDefaultGemsForRuby34(ctx *gcp.Context) error {
+	result, err := ctx.Exec([]string{"ruby", "-v"})
+	if err != nil {
+		return fmt.Errorf("getting ruby version: %w", err)
+	}
+	versionString := result.Stdout
+
+	matches := rubyVersionRe.FindStringSubmatch(versionString)
+	if len(matches) < 2 {
+		ctx.Warnf("Could not parse ruby version from %q, skipping installation of default gems for Ruby 3.4+.", versionString)
+		return nil
+	}
+	version, err := semver.NewVersion(matches[1])
+	if err != nil {
+		ctx.Warnf("Could not parse ruby version from %q, skipping installation of default gems for Ruby 3.4+.", matches[1])
+		return nil
+	}
+
+	// From Ruby 3.4, some default gems are bundled.
+	// https://rubyreferences.github.io/rubychanges/3.4.html#default-gems-that-became-bundled
+	constraint, err := semver.NewConstraint(">= 3.4")
+	if err != nil {
+		return fmt.Errorf("creating version constraint: %w", err)
+	}
+
+	if constraint.Check(version) {
+		ctx.Logf("Ruby version %s >= 3.4, installing bundled gems that are no longer default.", version.String())
+		gems := []string{
+			"abbrev",
+			"base64",
+			"bigdecimal",
+			"csv",
+			"drb",
+			"getoptlong",
+			"mutex_m",
+			"nkf",
+			"observer",
+			"resolv-replace",
+			"rinda",
+			"syslog",
+		}
+		for _, gem := range gems {
+			ctx.Logf("Installing %s", gem)
+			if _, err := ctx.Exec([]string{"bundle", "exec", "gem", "install", gem, "--no-document"}, gcp.WithUserAttribution); err != nil {
+				return fmt.Errorf("installing gem %s: %w", gem, err)
+			}
+		}
 	}
 
 	return nil
