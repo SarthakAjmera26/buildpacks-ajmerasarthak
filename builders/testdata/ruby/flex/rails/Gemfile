@@ -12,6 +12,19 @@ gem "puma", "~> 5.0"
 
 # Windows does not include zoneinfo files, so bundle the tzinfo-data gem
 gem "tzinfo-data", platforms: %i[ mingw mswin x64_mingw jruby ]
+gem "abbrev"
+gem "base64"
+gem "bigdecimal"
+gem "csv"
+gem "drb"
+gem "getoptlong"
+gem "mutex_m"
+gem "nkf"
+gem "observer"
+gem "racc"
+gem "resolv-replace"
+gem "rinda"
+gem "syslog"
 
 group :development do
   # Speed up commands on slow machines / big apps [https://github.com/rails/spring]

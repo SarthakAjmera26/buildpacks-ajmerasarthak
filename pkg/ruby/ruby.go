@@ -27,7 +27,7 @@ import (
 	gcp "github.com/GoogleCloudPlatform/buildpacks/pkg/gcpbuildpack"
 )
 
-const defaultVersion = "3.2.*"
+const defaultVersion = "3.4.*"
 
 // RubyVersionKey is the environment variable name used to store the Ruby version installed.
 const RubyVersionKey = "build_ruby_version"
@@ -124,6 +124,39 @@ func SupportsBundler1(ctx *gcp.Context) (bool, error) {
 	}
 	ruby32Version, _ := semver.NewVersion("3.2.0")
 	return rubyVersion.LessThan(ruby32Version), nil
+}
+
+// SupportsBundler2 returns true if the installed Ruby version is compatible with Bundler 2.
+// Bundler 2 is supported with all ruby versions that we support.
+func SupportsBundler2(ctx *gcp.Context) (bool, error) {
+	return true, nil
+}
+
+// DefaultGems returns a list of gems that are default in Ruby < 3.4 but bundled in Ruby 3.4+.
+func DefaultGems(ctx *gcp.Context) ([]string, error) {
+	rubyVersion, err := semver.NewVersion(os.Getenv(RubyVersionKey))
+	if err != nil {
+		return nil, err
+	}
+	ruby34Version, _ := semver.NewVersion("3.4.0")
+	if rubyVersion.GreaterThan(ruby34Version) || rubyVersion.Equal(ruby34Version) {
+		return []string{
+			"abbrev",
+			"base64",
+			"bigdecimal",
+			"csv",
+			"drb",
+			"getoptlong",
+			"mutex_m",
+			"nkf",
+			"observer",
+			"racc",
+			"resolv-replace",
+			"rinda",
+			"syslog",
+		}, nil
+	}
+	return nil, nil
 }
 
 // NeedsRailsAssetPrecompile detects if asset precompilation is required in a Ruby on Rails app.

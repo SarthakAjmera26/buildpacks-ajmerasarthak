@@ -363,6 +363,11 @@ func TestSupportsBundler1(t *testing.T) {
 			want:        false,
 		},
 		{
+			name:        "3.4.x",
+			rubyVersion: "3.4.0",
+			want:        false,
+		},
+		{
 			name:        "future versions",
 			rubyVersion: "4.3.0",
 			want:        false,
@@ -385,6 +390,65 @@ func TestSupportsBundler1(t *testing.T) {
 
 			if got != tc.want {
 				t.Errorf("SupportsBundler1(ctx) = %t, want %t", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestDefaultGems(t *testing.T) {
+	testCases := []struct {
+		name        string
+		rubyVersion string
+		want        []string
+	}{
+		{
+			name:        "3.4.0",
+			rubyVersion: "3.4.0",
+			want: []string{
+				"abbrev",
+				"base64",
+				"bigdecimal",
+				"csv",
+				"drb",
+				"getoptlong",
+				"mutex_m",
+				"nkf",
+				"observer",
+				"racc",
+				"resolv-replace",
+				"rinda",
+				"syslog",
+			},
+		},
+		{
+			name:        "3.2.0",
+			rubyVersion: "3.2.0",
+			want:        nil,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tempRoot := t.TempDir()
+			ctx := gcp.NewContext(gcp.WithApplicationRoot(tempRoot))
+
+			if tc.rubyVersion != "" {
+				t.Setenv(RubyVersionKey, tc.rubyVersion)
+			}
+			got, err := DefaultGems(ctx)
+
+			if err != nil {
+				t.Fatalf("DefaultGems(ctx) got error: %v", err)
+			}
+
+			if len(got) != len(tc.want) {
+				t.Errorf("DefaultGems(ctx) = %q, want %q", got, tc.want)
+			}
+
+			for i, v := range got {
+				if v != tc.want[i] {
+					t.Errorf("DefaultGems(ctx) = %q, want %q", got, tc.want)
+				}
 			}
 		})
 	}
