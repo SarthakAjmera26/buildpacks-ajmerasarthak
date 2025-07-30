@@ -120,6 +120,13 @@ func TestAcceptance(t *testing.T) {
 			MustUse:         []string{rubyRuntime, rubyBundle, entrypoint},
 			EnableCacheTest: false,
 		},
+		{
+			Name:    "ruby 3.4 bundled gems",
+			App:     "ruby34_app",
+			MustUse: []string{rubyRuntime, rubyBundle, entrypoint},
+			// This test is dependent on ruby version >= 3.4
+			VersionInclusionConstraint: ">= 3.4.0",
+		},
 	}
 
 	for _, tc := range acceptance.FilterTests(t, imageCtx, testCases) {
