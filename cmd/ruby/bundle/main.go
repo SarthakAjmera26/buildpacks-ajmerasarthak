@@ -18,11 +18,15 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/GoogleCloudPlatform/buildpacks/pkg/buildererror"
 	"github.com/GoogleCloudPlatform/buildpacks/pkg/cache"
 	gcp "github.com/GoogleCloudPlatform/buildpacks/pkg/gcpbuildpack"
+	"github.com/GoogleCloudPlatform/buildpacks/pkg/ruby"
+	"github.com/Masterminds/semver"
 	"github.com/buildpacks/libcnb/v2"
 )
 
@@ -30,6 +34,13 @@ const (
 	layerName         = "gems"
 	dependencyHashKey = "dependency_hash"
 	rubyVersionKey    = "ruby_version"
+)
+
+var (
+	// bundledGems is a list of gems that were default in Ruby < 3.4 and are now bundled.
+	bundledGems = []string{
+		"abbrev", "base64", "bigdecimal", "csv", "drb", "getoptlong", "mutex_m", "nkf", "observer", "resolv-replace", "rinda", "syslog",
+	}
 )
 
 func main() {
@@ -85,6 +96,10 @@ func buildFn(ctx *gcp.Context) error {
 			return buildererror.Errorf(buildererror.StatusFailedPrecondition, "Could not find gems.locked file in your app. Please make sure your bundle is up to date before deploying.")
 		}
 		lockFile = "gems.locked"
+	}
+
+	if err := addBundledGems(ctx); err != nil {
+		return err
 	}
 
 	// Remove any user-provided local bundle config and cache that can interfere with the build process.
@@ -207,4 +222,44 @@ func checkCache(ctx *gcp.Context, l *libcnb.Layer, opts ...cache.Option) (bool, 
 	ctx.SetMetadata(l, rubyVersionKey, currentRubyVersion)
 
 	return false, nil
+}
+
+func addBundledGems(ctx *gcp.Context) error {
+	version, err := semver.NewVersion(os.Getenv(ruby.RubyVersionKey))
+	if err != nil {
+		return fmt.Errorf("parsing ruby version: %w", err)
+	}
+
+	// Ruby 3.4 is the first version where these gems are not default.
+	ruby34, _ := semver.NewVersion("3.4.0")
+	if version.LessThan(ruby34) {
+		return nil
+	}
+
+	ctx.Logf("Ruby version >= 3.4, ensuring bundled gems are in Gemfile.")
+
+	gemfilePath := filepath.Join(ctx.ApplicationRoot(), "Gemfile")
+	content, err := os.ReadFile(gemfilePath)
+	if err != nil {
+		return fmt.Errorf("reading Gemfile: %w", err)
+	}
+
+	var gemsToAdd []string
+	for _, gem := range bundledGems {
+		// Check if the gem is already in the Gemfile. This is a simple check, but it should be
+		// sufficient for most cases.
+		if !strings.Contains(string(content), fmt.Sprintf("gem '%s'", gem)) &&
+			!strings.Contains(string(content), fmt.Sprintf("gem \"%s\"", gem)) {
+			gemsToAdd = append(gemsToAdd, fmt.Sprintf("gem '%s'", gem))
+		}
+	}
+
+	if len(gemsToAdd) > 0 {
+		newContent := string(content) + "\n# Added by buildpack\n" + strings.Join(gemsToAdd, "\n")
+		if err := os.WriteFile(gemfilePath, []byte(newContent), 0644); err != nil {
+			return fmt.Errorf("writing Gemfile: %w", err)
+		}
+	}
+
+	return nil
 }
