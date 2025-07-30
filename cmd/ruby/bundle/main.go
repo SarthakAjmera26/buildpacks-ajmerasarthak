@@ -19,10 +19,13 @@ package main
 import (
 	"fmt"
 	"path/filepath"
+	"regexp"
+	"strings"
 
 	"github.com/GoogleCloudPlatform/buildpacks/pkg/buildererror"
 	"github.com/GoogleCloudPlatform/buildpacks/pkg/cache"
 	gcp "github.com/GoogleCloudPlatform/buildpacks/pkg/gcpbuildpack"
+	"github.com/Masterminds/semver"
 	"github.com/buildpacks/libcnb"
 )
 
@@ -55,6 +58,10 @@ func detectFn(ctx *gcp.Context) (gcp.DetectResult, error) {
 }
 
 func buildFn(ctx *gcp.Context) error {
+	if err := addBundledGems(ctx); err != nil {
+		return fmt.Errorf("adding bundled gems: %w", err)
+	}
+
 	var lockFile string
 	hasGemfile, err := ctx.FileExists("Gemfile")
 	if err != nil {
@@ -207,4 +214,52 @@ func checkCache(ctx *gcp.Context, l *libcnb.Layer, opts ...cache.Option) (bool, 
 	ctx.SetMetadata(l, rubyVersionKey, currentRubyVersion)
 
 	return false, nil
+}
+
+func addBundledGems(ctx *gcp.Context) error {
+	result, err := ctx.Exec([]string{"ruby", "-v"})
+	if err != nil {
+		return err
+	}
+	// result.Stdout is like "ruby 3.4.0p0 (2025-03-28 revision 12345) [x86_64-linux]"
+	// We need to extract "3.4.0"
+	re := regexp.MustCompile(`ruby (\d+\.\d+\.\d+)`)
+	matches := re.FindStringSubmatch(result.Stdout)
+	if len(matches) < 2 {
+		// Not a ruby version we can parse, so we assume it's not 3.4+
+		return nil
+	}
+	rubyVersion, err := semver.NewVersion(matches[1])
+	if err != nil {
+		return fmt.Errorf("parsing ruby version %q: %w", matches[1], err)
+	}
+
+	v340, _ := semver.NewVersion("3.4.0")
+
+	if rubyVersion.GreaterThan(v340) || rubyVersion.Equal(v340) {
+		bundledGems := []string{"csv", "bigdecimal", "base64", "drb", "getoptlong", "mutex_m", "nkf", "observer", "resolv-replace", "rinda", "syslog"}
+
+		gemfileExists, err := ctx.FileExists("Gemfile")
+		if err != nil {
+			return err
+		}
+		if !gemfileExists {
+			return nil
+		}
+
+		gemfile, err := ctx.ReadFile("Gemfile")
+		if err != nil {
+			return err
+		}
+
+		for _, gem := range bundledGems {
+			if !strings.Contains(string(gemfile), "\""+gem+"\"") && !strings.Contains(string(gemfile), "'"+gem+"'") {
+				if err := ctx.WriteFile("Gemfile", []byte(fmt.Sprintf("\ngem \"%s\"", gem)), gcp.WithAppend()); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	return nil
 }
