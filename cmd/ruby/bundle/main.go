@@ -69,7 +69,7 @@ func buildFn(ctx *gcp.Context) error {
 			ctx.Warnf("Gemfile and gems.rb both exist. Using Gemfile.")
 		}
 		gemfileLockExists, err := ctx.FileExists("Gemfile.lock")
-		if err != nil {
+		if err !=.
 			return err
 		}
 		if !gemfileLockExists {
