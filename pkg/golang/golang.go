@@ -386,6 +386,9 @@ func isSupportedUnstableGoVersion(constraint string) bool {
 	if strings.Count(constraint, ".") == 1 && strings.Count(constraint, "rc") == 1 {
 		return true
 	}
+	if constraint == "1.25" {
+		return true
+	}
 	return false
 }
 

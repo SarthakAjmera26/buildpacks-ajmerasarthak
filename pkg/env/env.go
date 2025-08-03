@@ -103,6 +103,10 @@ const (
 	// Example: `-s -w` is sometimes used to strip and reduce binary size.
 	GoLDFlags = "GOOGLE_GOLDFLAGS"
 
+	// GoExperiment is an env var used to enable Go experiments.
+	// Example: `jsonv2` to enable the new JSONv2 decoder.
+	GoExperiment = "GOOGLE_GOEXPERIMENT"
+
 	// UseNativeImage is used to enable the GraalVM Java buildpack for native image compilation.
 	// Example: `true`, `True`, `1` will enable development mode.
 	UseNativeImage = "GOOGLE_JAVA_USE_NATIVE_IMAGE"

@@ -157,6 +157,9 @@ func goBuildFlags() []string {
 	if v := os.Getenv(env.GoLDFlags); v != "" {
 		flags = append(flags, "-ldflags", v)
 	}
+	if v := os.Getenv(env.GoExperiment); v != "" {
+		flags = append(flags, "-tags", v)
+	}
 	return flags
 }
 
