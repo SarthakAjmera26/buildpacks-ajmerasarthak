@@ -18,6 +18,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 
 	gcp "github.com/GoogleCloudPlatform/buildpacks/pkg/gcpbuildpack"
 	"github.com/GoogleCloudPlatform/buildpacks/pkg/golang"
@@ -56,6 +57,11 @@ func buildFn(ctx *gcp.Context) error {
 	if err != nil {
 		return fmt.Errorf("creating layer: %w", err)
 	}
+
+	if os.Getenv("GOOGLE_GO_JSONV2") == "true" {
+		grl.BuildEnvironment.Override("GOEXPERIMENT", "jsonv2")
+	}
+
 	_, err = runtime.InstallTarballIfNotCached(ctx, runtime.Go, version, grl)
 	return err
 }

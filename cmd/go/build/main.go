@@ -82,7 +82,17 @@ func buildFn(ctx *gcp.Context) error {
 	if workdir == "" {
 		workdir = ctx.ApplicationRoot()
 	}
-	if _, err := ctx.Exec(bld, gcp.WithEnv("GOCACHE="+cl.Path), gcp.WithWorkDir(workdir), gcp.WithMessageProducer(printTipsAndKeepStderrTail(ctx)), gcp.WithUserAttribution); err != nil {
+	execOpts := []gcp.ExecOption{
+		gcp.WithEnv("GOCACHE=" + cl.Path),
+		gcp.WithWorkDir(workdir),
+		gcp.WithMessageProducer(printTipsAndKeepStderrTail(ctx)),
+		gcp.WithUserAttribution,
+	}
+	if os.Getenv("GOOGLE_GO_JSONV2") == "true" {
+		execOpts = append(execOpts, gcp.WithEnv("GOEXPERIMENT=jsonv2"))
+	}
+
+	if _, err := ctx.Exec(bld, execOpts...); err != nil {
 		return err
 	}
 

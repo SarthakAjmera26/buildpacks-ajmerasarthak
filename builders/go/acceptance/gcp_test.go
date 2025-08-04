@@ -97,6 +97,13 @@ func TestAcceptance(t *testing.T) {
 			FilesMustExist:             []string{"/layers/google.go.build/bin/main"},
 			FilesMustNotExist:          []string{"/layers/google.go.runtime", "/workspace/main.go"},
 		},
+	{
+			Name: "jsonv2",
+			VersionInclusionConstraint: ">= 1.25",
+			App:                        "go/jsonv2",
+			Env:                        []string{"GOOGLE_GO_JSONV2=true"},
+			MustUse:                    []string{goRuntime, goBuild, goMod},
+		},
 	}
 
 	for _, tc := range acceptance.FilterTests(t, imageCtx, testCases) {
