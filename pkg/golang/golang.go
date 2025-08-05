@@ -100,7 +100,7 @@ func SupportsGoGet(ctx *gcp.Context) (bool, error) {
 	if v == "" {
 		return false, nil
 	}
-	return VersionMatches(ctx, "<1.22.0", v)
+	return VersionMatches(ctx, "<1.25.0", v)
 }
 
 // SupportsVendorModificaton returns true if the Go version supports modifying vendor directory without modifying vendor/modules.txt.
@@ -108,18 +108,18 @@ func SupportsGoGet(ctx *gcp.Context) (bool, error) {
 func SupportsVendorModificaton(ctx *gcp.Context) (bool, error) {
 	v, _ := RuntimeVersion(ctx)
 
-	// if runtimeVersion is not set, it uses latest version (which is going to be >=1.23.0) which does not support vendor modification without modifying vendor/modules.txt.
+	// if runtimeVersion is not set, it uses latest version (which is going to be >=1.25.0) which does not support vendor modification without modifying vendor/modules.txt.
 	if v == "" {
 		return false, nil
 	}
 
-	// if runtimeVersion is set, check if it is <1.23.0.
+	// if runtimeVersion is set, check if it is <1.25.0.
 	version, err := semver.NewVersion(v)
 	if err != nil {
 		return false, gcp.InternalErrorf("unable to parse version string %q: %w", v, err)
 	}
 
-	goVersionMatches, err := semver.NewConstraint("<1.23.0")
+	goVersionMatches, err := semver.NewConstraint("<1.25.0")
 	if err != nil {
 		return false, gcp.InternalErrorf("unable to parse version range %q: %w", v, err)
 	}
@@ -338,7 +338,7 @@ func RuntimeVersion(ctx *gcp.Context) (string, error) {
 	}
 
 	ctx.Logf("Using latest stable Go version")
-	return "", nil
+	return "1.25", nil
 }
 
 // ResolveGoVersion finds the latest version of Go that matches the provided semver constraint.
@@ -366,7 +366,7 @@ func ResolveGoVersion(verConstraint string) (string, error) {
 // When launching a new runtime, we need to test with RC candidate which will eventually be replaced
 // by a stable candidate. Till then, we will support these unstable releases in the QA for testing.
 func isSupportedUnstableGoVersion(constraint string) bool {
-	if strings.Count(constraint, ".") == 1 && strings.Count(constraint, "rc") == 1 {
+	if strings.Count(constraint, ".") == 1 && (strings.Count(constraint, "rc") == 1 || constraint == "1.25") {
 		return true
 	}
 	return false
