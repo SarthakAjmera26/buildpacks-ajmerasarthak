@@ -104,22 +104,22 @@ func SupportsGoGet(ctx *gcp.Context) (bool, error) {
 }
 
 // SupportsVendorModificaton returns true if the Go version supports modifying vendor directory without modifying vendor/modules.txt.
-// Versions 1.23.0 and later require vendored packages to be present in vendor/modules.txt to be imported.
+// Versions 1.25.0 and later require vendored packages to be present in vendor/modules.txt to be imported.
 func SupportsVendorModificaton(ctx *gcp.Context) (bool, error) {
 	v, _ := RuntimeVersion(ctx)
 
-	// if runtimeVersion is not set, it uses latest version (which is going to be >=1.23.0) which does not support vendor modification without modifying vendor/modules.txt.
+	// if runtimeVersion is not set, it uses latest version (which is going to be >=1.25.0) which does not support vendor modification without modifying vendor/modules.txt.
 	if v == "" {
 		return false, nil
 	}
 
-	// if runtimeVersion is set, check if it is <1.23.0.
+	// if runtimeVersion is set, check if it is <1.25.0.
 	version, err := semver.NewVersion(v)
 	if err != nil {
 		return false, gcp.InternalErrorf("unable to parse version string %q: %w", v, err)
 	}
 
-	goVersionMatches, err := semver.NewConstraint("<1.23.0")
+	goVersionMatches, err := semver.NewConstraint("<1.25.0")
 	if err != nil {
 		return false, gcp.InternalErrorf("unable to parse version range %q: %w", v, err)
 	}
@@ -343,7 +343,7 @@ func RuntimeVersion(ctx *gcp.Context) (string, error) {
 
 // ResolveGoVersion finds the latest version of Go that matches the provided semver constraint.
 func ResolveGoVersion(verConstraint string) (string, error) {
-	if isSupportedUnstableGoVersion(verConstraint) || isExactGoSemver(verConstraint) {
+	if isSupportedUnstableGoVersion(verConstraint) || isExactGoSemver(verConstraint) || verConstraint == "1.25" {
 		return verConstraint, nil
 	}
 	var releases []goRelease
