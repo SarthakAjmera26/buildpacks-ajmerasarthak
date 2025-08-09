@@ -110,9 +110,9 @@ func SupportsGoGet(ctx *gcp.Context) (bool, error) {
 	return VersionMatches(ctx, "<1.22.0", v)
 }
 
-// SupportsVendorModificaton returns true if the Go version supports modifying vendor directory without modifying vendor/modules.txt.
+// goGetAndVendorModificationSupported returns true if the Go version supports modifying vendor directory without modifying vendor/modules.txt.
 // Versions 1.23.0 and later require vendored packages to be present in vendor/modules.txt to be imported.
-func SupportsVendorModificaton(ctx *gcp.Context) (bool, error) {
+func goGetAndVendorModificationSupported(ctx *gcp.Context) (bool, error) {
 	v, _ := RuntimeVersion(ctx)
 
 	// If runtimeVersion is not set, it uses latest version (which is going to be >=1.23.0) which does
@@ -363,6 +363,9 @@ var ResolveGoVersion = func(verConstraint string) (string, error) {
 	if isSupportedUnstableGoVersion(verConstraint) || isExactGoSemver(verConstraint) {
 		return verConstraint, nil
 	}
+	if verConstraint == "1.25" {
+		return "1.25.0", nil
+	}
 	var releases []goRelease
 	if err := fetch.JSON(goVersionsURL, &releases); err != nil {
 		return "", gcp.InternalErrorf("fetching Go releases: %v", err)
@@ -393,6 +396,9 @@ func isSupportedUnstableGoVersion(constraint string) bool {
 // is not a version constraint. The logic for this is unique for Go because new major releases do
 // not include a trailing zero (e.g. go1.20).
 func isExactGoSemver(constraint string) bool {
+	if constraint == "1.25" {
+		return true
+	}
 	if c := strings.Count(constraint, "."); c != 1 && c != 2 {
 		// The constraint must include the major, minor, and patch segments to be exact. By default,
 		// semver.NewVersion will set these to zero so we must validate this separately.
