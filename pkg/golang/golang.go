@@ -103,6 +103,11 @@ func SupportsGoGet(ctx *gcp.Context) (bool, error) {
 	return VersionMatches(ctx, "<1.22.0", v)
 }
 
+// SupportsGo125 returns true if the Go version is 1.25.0 or greater.
+func SupportsGo125(ctx *gcp.Context) (bool, error) {
+	return VersionMatches(ctx, ">=1.25.0-0")
+}
+
 // SupportsVendorModificaton returns true if the Go version supports modifying vendor directory without modifying vendor/modules.txt.
 // Versions 1.23.0 and later require vendored packages to be present in vendor/modules.txt to be imported.
 func SupportsVendorModificaton(ctx *gcp.Context) (bool, error) {
