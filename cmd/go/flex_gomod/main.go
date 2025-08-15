@@ -41,12 +41,12 @@ func detectFn(ctx *gcp.Context) (gcp.DetectResult, error) {
 	if !env.IsFlex() {
 		return gcp.OptOut("Not a GAE Flex app."), nil
 	}
-	goModExists, err := ctx.FileExists("go.mod")
+	goMods, err := ctx.Glob("**/go.mod")
 	if err != nil {
 		return nil, err
 	}
-	if !goModExists {
-		return gcp.OptOutFileNotFound("go.mod"), nil
+	if len(goMods) == 0 {
+		return gcp.OptOut("no go.mod files found"), nil
 	}
 
 	if path, exists := os.LookupEnv(env.Buildable); exists {
