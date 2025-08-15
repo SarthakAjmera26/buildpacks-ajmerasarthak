@@ -71,10 +71,17 @@ func detectFn(ctx *gcp.Context) (gcp.DetectResult, error) {
 	if golang.IsGo111Runtime() {
 		return gcp.OptOut("Incompatible with go111"), nil
 	}
-	if _, ok := os.LookupEnv(env.FunctionTarget); ok {
-		return gcp.OptInEnvSet(env.FunctionTarget), nil
+	if _, ok := os.LookupEnv(env.FunctionTarget); !ok {
+		return gcp.OptOutEnvNotSet(env.FunctionTarget), nil
 	}
-	return gcp.OptOutEnvNotSet(env.FunctionTarget), nil
+	goMods, err := ctx.Glob("**/go.mod")
+	if err != nil {
+		return nil, err
+	}
+	if len(goMods) == 0 {
+		return gcp.OptOut("no go.mod files found"), nil
+	}
+	return gcp.OptIn("found go.mod and GOOGLE_FUNCTION_TARGET is set"), nil
 }
 
 func buildFn(ctx *gcp.Context) error {

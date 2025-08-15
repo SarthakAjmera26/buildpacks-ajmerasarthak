@@ -19,6 +19,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	gcp "github.com/GoogleCloudPlatform/buildpacks/pkg/gcpbuildpack"
 	"github.com/GoogleCloudPlatform/buildpacks/pkg/golang"
@@ -29,14 +30,25 @@ func main() {
 }
 
 func detectFn(ctx *gcp.Context) (gcp.DetectResult, error) {
-	goModExists, err := ctx.FileExists("go.mod")
+	goMods, err := ctx.Glob("**/go.mod")
 	if err != nil {
 		return nil, err
 	}
-	if goModExists {
-		return gcp.OptInFileFound("go.mod"), nil
+	if len(goMods) > 0 {
+		if len(goMods) > 1 {
+			ctx.Warnf("Multiple go.mod files found. Using the one in the root directory. To specify a different module, set the GOOGLE_GO_MODULE_ROOT environment variable.")
+			// If there are multiple go.mod files, we will use the one in the root directory.
+			for _, goMod := range goMods {
+				if goMod == "go.mod" {
+					return gcp.OptInFileFound("go.mod"), nil
+				}
+			}
+			// If there is no go.mod in the root directory, we will not handle this case for now.
+			return gcp.OptOut("multiple go.mod files found and none in root directory"), nil
+		}
+		return gcp.OptInFileFound(goMods[0]), nil
 	}
-	return gcp.OptOutFileNotFound("go.mod"), nil
+	return gcp.OptOut("no go.mod files found"), nil
 }
 
 func buildFn(ctx *gcp.Context) error {
@@ -45,7 +57,16 @@ func buildFn(ctx *gcp.Context) error {
 		return fmt.Errorf("creating GOPATH layer: %w", err)
 	}
 
-	vendorExists, err := ctx.FileExists("vendor")
+	goMods, err := ctx.Glob("**/go.mod")
+	if err != nil {
+		return fmt.Errorf("finding go.mod: %w", err)
+	}
+	if len(goMods) == 0 {
+		return gcp.UserErrorf("go.mod not found")
+	}
+	moduleRoot := filepath.Dir(goMods[0])
+
+	vendorExists, err := ctx.FileExists(filepath.Join(moduleRoot, "vendor"))
 	if err != nil {
 		return err
 	}
@@ -64,14 +85,14 @@ func buildFn(ctx *gcp.Context) error {
 		ctx.Warnf(`Ignoring "vendor" directory: To use vendor directory, the Go runtime must be 1.14+ and go.mod must contain a "go 1.14"+ entry. See https://cloud.google.com/appengine/docs/standard/go/specifying-dependencies#vendoring_dependencies.`)
 	}
 
-	goModIsWriteable, err := ctx.IsWritable("go.mod")
+	goModIsWriteable, err := ctx.IsWritable(goMods[0])
 	if err != nil {
 		return err
 	}
 	if !goModIsWriteable {
 		// Preempt an obscure failure mode: if go.mod is not writable then `go list -m` can fail saying:
 		//     go: updates to go.sum needed, disabled by -mod=readonly
-		return gcp.UserErrorf("go.mod exists but is not writable")
+		return gcp.UserErrorf("%s exists but is not writable", goMods[0])
 	}
 	env := []string{"GOPATH=" + l.Path, "GO111MODULE=on"}
 
@@ -80,8 +101,9 @@ func buildFn(ctx *gcp.Context) error {
 	if workdir == "" {
 		workdir = ctx.ApplicationRoot()
 	}
+	workdir = filepath.Join(workdir, moduleRoot)
 
-	goSumExists, err := ctx.FileExists("go.sum")
+	goSumExists, err := ctx.FileExists(filepath.Join(moduleRoot, "go.sum"))
 	if err != nil {
 		return err
 	}
@@ -94,7 +116,7 @@ func buildFn(ctx *gcp.Context) error {
 		}
 	}
 
-	if _, err := golang.ExecWithGoproxyFallback(ctx, []string{"go", "mod", "download"}, gcp.WithEnv(env...), gcp.WithUserAttribution); err != nil {
+	if _, err := golang.ExecWithGoproxyFallback(ctx, []string{"go", "mod", "download"}, gcp.WithEnv(env...), gcp.WithWorkDir(workdir), gcp.WithUserAttribution); err != nil {
 		return fmt.Errorf("running go mod download: %w", err)
 	}
 
