@@ -52,6 +52,15 @@ func buildFn(ctx *gcp.Context) error {
 	if err != nil {
 		return err
 	}
+
+	isGo125, err := golang.SupportsGo125(ctx)
+	if err != nil {
+		return err
+	}
+	if isGo125 {
+		ctx.Logf("Go version is 1.25 or greater")
+	}
+
 	grl, err := ctx.Layer(goLayer, gcp.BuildLayer, gcp.CacheLayer, gcp.LaunchLayerIfDevMode)
 	if err != nil {
 		return fmt.Errorf("creating layer: %w", err)

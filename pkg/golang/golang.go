@@ -131,6 +131,11 @@ func SupportsVendorModificaton(ctx *gcp.Context) (bool, error) {
 	return false, nil
 }
 
+// SupportsGo125 returns true if the Go version is 1.25 or greater.
+func SupportsGo125(ctx *gcp.Context) (bool, error) {
+	return IsGo125OrAbove(ctx)
+}
+
 // VersionMatches checks if the installed version of Go and the version specified in go.mod match the given version range.
 // The range string has the following format: https://github.com/blang/semver#ranges.
 func VersionMatches(ctx *gcp.Context, versionRange string, goVersions ...string) (bool, error) {
