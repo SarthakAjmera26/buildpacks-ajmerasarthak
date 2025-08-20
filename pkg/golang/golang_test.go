@@ -351,7 +351,7 @@ func TestSupportsAutoVendor(t *testing.T) {
 			want:      true,
 		},
 		{
-			goVersion: "go version go1.13 darwin/amd64",
+			goVersion: "go version go1.13 darwin/amd64",	
 			goMod:     "module dir\ngo 1.14",
 			want:      false,
 		},
@@ -360,6 +360,7 @@ func TestSupportsAutoVendor(t *testing.T) {
 			want:  false,
 		},
 	}
+
 
 	for _, tc := range testCases {
 		t.Run(tc.goMod, func(t *testing.T) {
