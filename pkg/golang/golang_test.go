@@ -591,6 +591,25 @@ func TestResolveGoVersion(t *testing.T) {
 }
 ]`,
 		},
+		{
+			name: "go1.25",
+			want: "1.25",
+			json: `
+[
+ {
+  "version": "go1.25",
+  "stable": true
+ },
+ {
+  "version": "go1.24.1",
+  "stable": true
+ },
+ {
+  "version": "go1.23.2",
+  "stable": true
+ }
+]`,
+		},
 	}
 
 	for _, tc := range testCases {
