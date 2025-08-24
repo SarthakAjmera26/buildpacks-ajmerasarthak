@@ -90,6 +90,24 @@ func SupportsGoCleanModCache(ctx *gcp.Context) (bool, error) {
 	return VersionMatches(ctx, ">=1.13.0")
 }
 
+// SupportsGoModIgnore returns true if the Go version supports the `go.mod ignore` directive.
+// This feature is supported by Go 1.25 and higher.
+func SupportsGoModIgnore(ctx *gcp.Context) (bool, error) {
+	return VersionMatches(ctx, ">=1.25.0")
+}
+
+// SupportsSubdirModuleRoot returns true if the Go version supports using a subdirectory of a repository as a module root.
+// This feature is supported by Go 1.25 and higher.
+func SupportsSubdirModuleRoot(ctx *gcp.Context) (bool, error) {
+	return VersionMatches(ctx, ">=1.25.0")
+}
+
+// SupportsWorkPackagePattern returns true if the Go version supports the `work` package pattern.
+// This feature is supported by Go 1.25 and higher.
+func SupportsWorkPackagePattern(ctx *gcp.Context) (bool, error) {
+	return VersionMatches(ctx, ">=1.25.0")
+}
+
 // SupportsGoGet returns true if the Go version supports `go get`.
 // For versions above 1.22.0+ `go get` is not supported outside of modules in legacy gopath mode.
 func SupportsGoGet(ctx *gcp.Context) (bool, error) {
