@@ -366,6 +366,9 @@ func ResolveGoVersion(verConstraint string) (string, error) {
 // When launching a new runtime, we need to test with RC candidate which will eventually be replaced
 // by a stable candidate. Till then, we will support these unstable releases in the QA for testing.
 func isSupportedUnstableGoVersion(constraint string) bool {
+	if constraint == "1.25" {
+		return true
+	}
 	if strings.Count(constraint, ".") == 1 && strings.Count(constraint, "rc") == 1 {
 		return true
 	}
