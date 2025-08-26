@@ -91,7 +91,7 @@ func SupportsGoCleanModCache(ctx *gcp.Context) (bool, error) {
 }
 
 // SupportsGoGet returns true if the Go version supports `go get`.
-// For versions above 1.22.0+ `go get` is not supported outside of modules in legacy gopath mode.
+// For versions above 1.25.0+ `go get` is not supported outside of modules in legacy gopath mode.
 func SupportsGoGet(ctx *gcp.Context) (bool, error) {
 	v, err := RuntimeVersion(ctx)
 	if err != nil {
@@ -100,7 +100,7 @@ func SupportsGoGet(ctx *gcp.Context) (bool, error) {
 	if v == "" {
 		return false, nil
 	}
-	return VersionMatches(ctx, "<1.22.0", v)
+	return VersionMatches(ctx, "<1.25.0", v)
 }
 
 // SupportsVendorModificaton returns true if the Go version supports modifying vendor directory without modifying vendor/modules.txt.
@@ -129,6 +129,11 @@ func SupportsVendorModificaton(ctx *gcp.Context) (bool, error) {
 	}
 
 	return false, nil
+}
+
+// SupportsGo125 returns true if the Go version is 1.25 or greater.
+func SupportsGo125(ctx *gcp.Context) (bool, error) {
+	return VersionMatches(ctx, ">=1.25.0")
 }
 
 // VersionMatches checks if the installed version of Go and the version specified in go.mod match the given version range.

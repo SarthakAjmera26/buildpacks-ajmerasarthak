@@ -43,3 +43,12 @@ builder(
     image = "gcp/go-22",
     stack = "google.gae.22",
 )
+
+builder(
+    name = "builder_25",
+    builder_template = ":builder.toml.template",
+    buildpacks = BUILDPACKS,
+    descriptor = "builder.toml",
+    image = "gcp/go-25",
+    stack = "google.gae.22",
+)
