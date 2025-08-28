@@ -366,21 +366,23 @@ func ResolveGoVersion(verConstraint string) (string, error) {
 // When launching a new runtime, we need to test with RC candidate which will eventually be replaced
 // by a stable candidate. Till then, we will support these unstable releases in the QA for testing.
 func isSupportedUnstableGoVersion(constraint string) bool {
-	if strings.Count(constraint, ".") == 1 && strings.Count(constraint, "rc") == 1 {
-		return true
-	}
-	return false
+	// Allow RC versions, e.g., "1.25rc1", "1.25.0-rc1".
+	return strings.Contains(constraint, "rc")
 }
 
 // isExactGoSemver returns true if a given string is a precisely specified go version. That is, it
 // is not a version constraint. The logic for this is unique for Go because new major releases do
 // not include a trailing zero (e.g. go1.20).
 func isExactGoSemver(constraint string) bool {
-	if c := strings.Count(constraint, "."); c != 1 && c != 2 {
-		// The constraint must include the major, minor, and patch segments to be exact. By default,
-		// semver.NewVersion will set these to zero so we must validate this separately.
-		return false
+	// Allow versions like "1.25"
+	if _, err := semver.NewVersion(constraint); err == nil {
+		return true
 	}
-	_, err := semver.NewVersion(constraint)
-	return err == nil
+	// Allow versions like "go1.25"
+	if strings.HasPrefix(constraint, "go") {
+		if _, err := semver.NewVersion(strings.TrimPrefix(constraint, "go")); err == nil {
+			return true
+		}
+	}
+	return false
 }
