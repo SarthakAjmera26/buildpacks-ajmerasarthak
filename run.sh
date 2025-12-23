@@ -1,0 +1,1 @@
+python3 run_gemini.py "create a new file named hello.txt in buildpacks/cmd/go"
